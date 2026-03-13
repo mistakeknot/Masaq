@@ -4,10 +4,13 @@
 package viewport
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/mistakeknot/Masaq/theme"
 )
 
 // Model is a scrollable viewport that can be embedded in a Bubble Tea program.
@@ -120,6 +123,46 @@ func (m *Model) ScrollDown(n int) {
 func (m *Model) ScrollToBottom() {
 	m.scrollToEnd()
 	m.autoScroll = true
+}
+
+// ScrollPercent returns the scroll position as a fraction in [0, 1].
+// Returns 1.0 when at the bottom or when content fits on screen.
+func (m Model) ScrollPercent() float64 {
+	max := m.maxOffset()
+	if max <= 0 {
+		return 1.0
+	}
+	return float64(m.offset) / float64(max)
+}
+
+// LinesBelow returns the number of content lines below the visible area.
+func (m Model) LinesBelow() int {
+	below := len(m.lines) - (m.offset + m.height)
+	if below < 0 {
+		return 0
+	}
+	return below
+}
+
+// ScrollIndicator returns a themed hint string when content exists below the
+// visible area (e.g., "↓ 12 more lines"). Returns empty string when at bottom
+// or when all content is visible. The indicator is rendered in the theme's
+// FgDim color and right-aligned to the given width.
+func (m Model) ScrollIndicator(width int) string {
+	below := m.LinesBelow()
+	if below <= 0 {
+		return ""
+	}
+	label := fmt.Sprintf("↓ %d more lines", below)
+	style := lipgloss.NewStyle().Foreground(theme.Current().Semantic().FgDim.Color())
+	rendered := style.Render(label)
+
+	// Right-align within the given width.
+	pad := width - len(label)
+	if pad <= 0 {
+		return rendered
+	}
+	return strings.Repeat(" ", pad) + rendered
 }
 
 // Init satisfies tea.Model. Returns nil.

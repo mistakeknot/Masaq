@@ -70,3 +70,60 @@ func TestSetSize(t *testing.T) {
 		t.Fatalf("after resize got %dx%d, want 40x12", vp.Width(), vp.Height())
 	}
 }
+
+func TestScrollPercent(t *testing.T) {
+	vp := viewport.New(40, 2)
+	// No content — at bottom.
+	if pct := vp.ScrollPercent(); pct != 1.0 {
+		t.Fatalf("empty viewport scroll%% = %v, want 1.0", pct)
+	}
+	// Add 10 lines, auto-scrolled to bottom.
+	for i := 0; i < 10; i++ {
+		vp.AppendContent("line\n")
+	}
+	if pct := vp.ScrollPercent(); pct != 1.0 {
+		t.Fatalf("at bottom scroll%% = %v, want 1.0", pct)
+	}
+	// Scroll to top.
+	vp.ScrollUp(100)
+	if pct := vp.ScrollPercent(); pct != 0.0 {
+		t.Fatalf("at top scroll%% = %v, want 0.0", pct)
+	}
+}
+
+func TestLinesBelow(t *testing.T) {
+	vp := viewport.New(40, 3)
+	vp.SetContent("a\nb\nc\nd\ne")
+	// 5 lines, height 3, auto-scrolled to bottom → 0 below.
+	if below := vp.LinesBelow(); below != 0 {
+		t.Fatalf("at bottom LinesBelow = %d, want 0", below)
+	}
+	// Scroll up to top.
+	vp.ScrollUp(100)
+	if below := vp.LinesBelow(); below != 2 {
+		t.Fatalf("at top LinesBelow = %d, want 2", below)
+	}
+}
+
+func TestScrollIndicator(t *testing.T) {
+	vp := viewport.New(40, 2)
+	// No content below → empty.
+	if ind := vp.ScrollIndicator(40); ind != "" {
+		t.Fatalf("at bottom indicator should be empty, got %q", ind)
+	}
+	// Add content and scroll up.
+	for i := 0; i < 10; i++ {
+		vp.AppendContent("line\n")
+	}
+	vp.ScrollUp(5)
+	ind := vp.ScrollIndicator(40)
+	if ind == "" {
+		t.Fatal("indicator should be non-empty when content is below fold")
+	}
+	if !strings.Contains(ind, "more lines") {
+		t.Fatalf("indicator should contain 'more lines', got %q", ind)
+	}
+	if !strings.Contains(ind, "↓") {
+		t.Fatalf("indicator should contain ↓, got %q", ind)
+	}
+}
