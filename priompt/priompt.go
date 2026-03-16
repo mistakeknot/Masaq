@@ -13,10 +13,24 @@ import (
 	"strings"
 )
 
+// RenderContext provides dynamic rendering context to ContentFunc.
+type RenderContext struct {
+	Phase     string
+	Model     string
+	TurnCount int
+	Budget    int
+}
+
+// ContentFunc generates element content dynamically per render cycle.
+// When set on an Element, it is called instead of using the static Content field.
+// If it returns an empty string, the element is excluded from the render.
+type ContentFunc func(ctx RenderContext) string
+
 // Element is a prompt section with priority metadata.
 type Element struct {
 	Name       string         // identifier for debugging/metrics
-	Content    string         // the actual prompt text
+	Content    string         // the actual prompt text (used when Render is nil)
+	Render     ContentFunc    // optional dynamic content generator (takes precedence over Content)
 	Priority   int            // higher = more important (0-100 suggested range)
 	PhaseBoost map[string]int // phase tag → priority adjustment
 	Stable     bool           // render first for cache prefix stability
@@ -56,6 +70,8 @@ type Option func(*renderConfig)
 
 type renderConfig struct {
 	phase     string
+	model     string
+	turnCount int
 	tokenizer Tokenizer
 	separator string
 }
@@ -72,6 +88,20 @@ func WithPhase(tag string) Option {
 func WithTokenizer(t Tokenizer) Option {
 	return func(c *renderConfig) {
 		c.tokenizer = t
+	}
+}
+
+// WithModel sets the model name for RenderContext.
+func WithModel(model string) Option {
+	return func(c *renderConfig) {
+		c.model = model
+	}
+}
+
+// WithTurnCount sets the turn count for RenderContext.
+func WithTurnCount(n int) Option {
+	return func(c *renderConfig) {
+		c.turnCount = n
 	}
 }
 
@@ -104,9 +134,18 @@ func Render(elements []Element, budget int, opts ...Option) RenderResult {
 		o(&cfg)
 	}
 
-	// Filter out empty content elements.
+	// Resolve dynamic content and filter out empty elements.
+	rctx := RenderContext{
+		Phase:     cfg.phase,
+		Model:     cfg.model,
+		TurnCount: cfg.turnCount,
+		Budget:    budget,
+	}
 	var filtered []Element
 	for _, e := range elements {
+		if e.Render != nil {
+			e.Content = e.Render(rctx)
+		}
 		if e.Content != "" {
 			filtered = append(filtered, e)
 		}

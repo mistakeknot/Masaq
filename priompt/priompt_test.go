@@ -434,3 +434,126 @@ func TestNegativeBoostDemotes(t *testing.T) {
 		t.Fatalf("negative boost should demote, got %v", r.Included)
 	}
 }
+
+// --- ContentFunc (dynamic rendering) tests ---
+
+func TestContentFuncOverridesStatic(t *testing.T) {
+	elems := []priompt.Element{
+		{
+			Name:     "dynamic",
+			Content:  "static fallback",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				return "dynamic content"
+			},
+		},
+	}
+	r := priompt.Render(elems, 10000)
+	if r.Prompt != "dynamic content" {
+		t.Fatalf("expected dynamic content, got %q", r.Prompt)
+	}
+}
+
+func TestContentFuncReceivesPhase(t *testing.T) {
+	elems := []priompt.Element{
+		{
+			Name:     "phase-aware",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				return "phase=" + ctx.Phase
+			},
+		},
+	}
+	r := priompt.Render(elems, 10000, priompt.WithPhase("build"))
+	if r.Prompt != "phase=build" {
+		t.Fatalf("expected phase=build, got %q", r.Prompt)
+	}
+}
+
+func TestContentFuncReceivesModel(t *testing.T) {
+	elems := []priompt.Element{
+		{
+			Name:     "model-aware",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				return "model=" + ctx.Model
+			},
+		},
+	}
+	r := priompt.Render(elems, 10000, priompt.WithModel("opus"))
+	if r.Prompt != "model=opus" {
+		t.Fatalf("expected model=opus, got %q", r.Prompt)
+	}
+}
+
+func TestContentFuncReceivesTurnCount(t *testing.T) {
+	var gotTurn int
+	elems := []priompt.Element{
+		{
+			Name:     "turn-aware",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				gotTurn = ctx.TurnCount
+				return "ok"
+			},
+		},
+	}
+	priompt.Render(elems, 10000, priompt.WithTurnCount(42))
+	if gotTurn != 42 {
+		t.Fatalf("expected turn count 42, got %d", gotTurn)
+	}
+}
+
+func TestContentFuncEmptyExcludes(t *testing.T) {
+	elems := []priompt.Element{
+		{
+			Name:     "conditional",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				if ctx.Phase == "build" {
+					return "build instructions"
+				}
+				return "" // excluded in other phases
+			},
+		},
+		{Name: "always", Content: "hello", Priority: 5},
+	}
+	// In review phase, conditional returns empty → excluded
+	r := priompt.Render(elems, 10000, priompt.WithPhase("review"))
+	if len(r.Included) != 1 || r.Included[0] != "always" {
+		t.Fatalf("conditional should be excluded in review, got %v", r.Included)
+	}
+	// In build phase, conditional returns content → included
+	r2 := priompt.Render(elems, 10000, priompt.WithPhase("build"))
+	if len(r2.Included) != 2 {
+		t.Fatalf("conditional should be included in build, got %v", r2.Included)
+	}
+}
+
+func TestContentFuncNilFallsBackToContent(t *testing.T) {
+	elems := []priompt.Element{
+		{Name: "static", Content: "hello", Priority: 10, Render: nil},
+	}
+	r := priompt.Render(elems, 10000)
+	if r.Prompt != "hello" {
+		t.Fatalf("nil Render should use static Content, got %q", r.Prompt)
+	}
+}
+
+func TestContentFuncBudgetInContext(t *testing.T) {
+	var gotBudget int
+	elems := []priompt.Element{
+		{
+			Name:     "budget-aware",
+			Priority: 10,
+			Render: func(ctx priompt.RenderContext) string {
+				gotBudget = ctx.Budget
+				return "ok"
+			},
+		},
+	}
+	priompt.Render(elems, 5000)
+	if gotBudget != 5000 {
+		t.Fatalf("expected budget 5000, got %d", gotBudget)
+	}
+}
