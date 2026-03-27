@@ -83,7 +83,7 @@ func (t Theme) Semantic() SemanticColors {
 	return t.semantic
 }
 
-// TokyoNight is the default Demarch theme based on Tokyo Night.
+// TokyoNight is the default Sylveste theme based on Tokyo Night.
 var TokyoNight = Theme{
 	Name: "Tokyo Night",
 	semantic: SemanticColors{
