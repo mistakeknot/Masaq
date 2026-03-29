@@ -119,6 +119,20 @@ func (m *Model) ScrollDown(n int) {
 	}
 }
 
+// ScrollToLine scrolls so that line n is at the top of the viewport.
+// Clamps to [0, maxOffset]. Disables autoScroll.
+func (m *Model) ScrollToLine(n int) {
+	if n < 0 {
+		n = 0
+	}
+	max := m.maxOffset()
+	if n > max {
+		n = max
+	}
+	m.offset = n
+	m.autoScroll = false
+}
+
 // ScrollToBottom scrolls to the end of the content and re-enables autoScroll.
 func (m *Model) ScrollToBottom() {
 	m.scrollToEnd()
