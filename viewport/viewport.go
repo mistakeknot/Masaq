@@ -133,6 +133,20 @@ func (m *Model) ScrollToLine(n int) {
 	m.autoScroll = false
 }
 
+// ScrollTo scrolls so that the given line index is at the top of the viewport.
+// AutoScroll is disabled unless the target is at the bottom.
+func (m *Model) ScrollTo(line int) {
+	if line < 0 {
+		line = 0
+	}
+	max := m.maxOffset()
+	if line > max {
+		line = max
+	}
+	m.offset = line
+	m.autoScroll = m.AtBottom()
+}
+
 // ScrollToBottom scrolls to the end of the content and re-enables autoScroll.
 func (m *Model) ScrollToBottom() {
 	m.scrollToEnd()
